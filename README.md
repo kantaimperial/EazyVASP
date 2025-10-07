@@ -1,6 +1,6 @@
 # EazyVASP
 
-_A lightweight workflow assistant for automated VASP input generation and convergence testing, fully compatible with [vaspup2.0](https://github.com/Seanstk/vaspup2.0)._
+_A lightweight workflow assistant for automated VASP input generation and convergence testing, fully compatible with [vaspup2.0](https://github.com/kavanase/vaspup2.0)._
 
 ---
 
@@ -21,6 +21,14 @@ _A lightweight workflow assistant for automated VASP input generation and conver
 ---
 ## Insatllation
 Installation is quite simple, just clone this git repository and update your PATH to include the location of the bin folder.
+
+`git clone https://github.com/kantaimperial/EazyVASP.git
+echo 'export PATH=$PATH:~/EazyVASP' >> ~/.bashrc
+source ~/.bashrc`
+
+Then you can use the commands from anywhere:
+`generate_config_vasp
+generate_POTCAR /path/to/potpaw_PBE`
 
 
 

@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import shutil
+from pathlib import Path
+
+def make_input_dir():
+    input_dir = Path("input")
+    input_dir.mkdir(exist_ok=True)
+    print(f"[INFO] Created directory: {input_dir.resolve()}")
+    return input_dir
+
+def move_poscar(input_dir):
+    poscar = Path("POSCAR")
+    if not poscar.exists():
+        raise FileNotFoundError("POSCAR not found in current directory.")
+    shutil.copy(poscar, input_dir / "POSCAR")
+    print(f"[INFO] Copied POSCAR to {input_dir}/POSCAR")
+
+def write_incar(input_dir):
+    incar_text = """SYSTEM = Input (original: WMD input, modified by KO)
+GGA=PS  #PBEsol
+#METAGGA = R2SCAN
+#LASPH = .TRUE.
+
+PREC=Accurate
+ENCUT = 550.0
+LREAL= False
+#LWAVE=.TRUE.
+
+ALGO=FAST
+NCORE=7
+#KPAR=2
+
+NELM=500
+NELMIN=2
+EDIFF=1e-06
+#ISYM = 2 #0 for MLFF
+
+
+IBRION = 2 # 0 for MLFF
+EDIFFG=-0.01
+
+NSW=0
+
+ISIF=3
+
+ISMEAR=0
+SIGMA=0.01
+
+#LVTOT=.FALSE.
+#LVHAR=.FALSE.
+#LCHARG= .FALSE.
+
+#PDOS
+#LORBIT=11
+#NEDOS=2000
+
+#Visualization of charge density
+#NPARD=.TRUE.
+#NBMOD=-2
+#EINT=
+
+
+#DFT-U
+#LDAU      = .TRUE.
+#LDAUTYPE  = 2
+#LDAUL     = 2 -1      # l quantum number where U is added for each atom; -1 is no U added
+#LDAUU     = 7.00 0.00 # on-site Coulomb interaction (in eV) for each atom
+#LMAXMIX   = 4
+
+#pressure
+#PSTRESS = 0
+
+
+#DFT+D3
+#IVDW=11
+#VDW_S8=0.109
+#VDW_SR=1.129
+#IVDW=12
+#VDW_S8 = 0.78981345 #r2scan_12
+#VDW_A1 = 0.49484001 #r2scan_12
+#VDW_A2 = 5.73083694 #r2scan_12
+#VDW_S8 = 2.310 #hse06_12
+#VDW_A1 = 0.383 #hse06_12
+#VDW_A2 = 5.685 #hse06_12
+
+#HSE06
+#LHFCALC = .TRUE.
+#HFSCREEN = 0.2
+#PRECFOCK = Fast
+#ALGO = Normal
+#TIME = 0.4
+
+#NKRED=2
+
+
+
+#MLFF
+#IBRION = 0
+#ML_MODE = refit
+#MDALGO = 3
+#ML_MB=10000
+#ML_MCONF=500
+#ML_CALGO=1
+
+
+#ISIF = 3
+#SMASS = 0.2
+#TEBEG = 100
+#NSW = 100000
+#POTIM = 0.5  #larger for softer materials
+#RANDOM_SEED =          88951986                0                0
+#LANGEVIN_GAMMA_L = 10.0
+#LANGEVIN_GAMMA = 10.0 10.0 10.0
+#PMASS = 1000
+#PSTRESS = 0.001
+#Machine learning paramters
+#ML_LMLFF = .TRUE.
+"""
+    (input_dir / "INCAR").write_text(incar_text)
+    print(f"[INFO] Wrote INCAR (KO template)")
+
+def write_kpoints(input_dir):
+    kpoints_text = """Auto
+0
+Gamma
+  7     7     3
+  0.00  0.00  0.00
+"""
+    (input_dir / "KPOINTS").write_text(kpoints_text)
+    print(f"[INFO] Wrote KPOINTS (7x7x3 Gamma-centered)")
+
+def write_job(input_dir):
+    job_text = """#!/bin/bash
+#============ Slurm Options ===========
+#SBATCH -p gr10622a         # Specify job queue name (partition name).
+#SBATCH -t 1:00:00          # Specify an elapsed time.
+#SBATCH --rsc p=14:t=1:c=1  # Specify the requested resource.
+##SBATCH -N 5
+#SBATCH -o %x.%j.out        # Specify the standard output/error output file for the job.
+#SBATCH -J vasp_out
+#============ Shell Script ============
+set -x
+srun /LARGE0/gr10622/common/vasp6.5.1/vasp.6.5.1/bin/vasp_std
+"""
+    (input_dir / "job").write_text(job_text)
+    os.chmod(input_dir / "job", 0o755)
+    print(f"[INFO] Wrote job (Slurm, gr10622a partition)")
+
+def write_config(input_dir):
+    config_text = """# vaspup2.0 - Seán Kavanagh (sean.kavanagh.19@ucl.ac.uk), 2020
+# This is the default config for automating convergence.
+# Works for ground-state energy convergence and DFPT convergence.
+# Make sure to rename to CONFIG before running.
+
+conv_encut="1"          # 1 for ON, 0 for OFF (ENCUT Convergence Testing)
+encut_start="300"       # Value to start ENCUT calcs from.
+encut_end="600"         # Value to end ENCUT calcs on.
+encut_step="50"         # ENCUT increment.
+
+conv_kpoint="1"         # 1 for ON, 0 for OFF (KPOINTS Convergence Testing)
+kpoints='3 3 1,4 4 1,4 4 2,5 5 2,6 6 2,7 7 2,7 7 3,8 8 3,9 9 3,10 10 3'
+# you want to try, separated by a comma
+
+run_vasp="1"            # Run VASP after generating the files? (1 for ON, 0 for OFF)
+#name="CdTeDFPT" # Optional name to append to each jobname (remove "#")
+"""
+    (input_dir / "CONFIG").write_text(config_text)
+    print(f"[INFO] Wrote CONFIG (vaspup2.0 format)")
+
+def main():
+    input_dir = make_input_dir()
+    move_poscar(input_dir)
+    write_incar(input_dir)
+    write_kpoints(input_dir)
+    write_job(input_dir)
+    write_config(input_dir)
+    print("[INFO] All files generated under ./input/")
+
+if __name__ == "__main__":
+    main()

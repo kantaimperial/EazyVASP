@@ -1,0 +1,108 @@
+#!/usr/bin/env python3.11
+# -*- coding: utf-8 -*-
+"""
+generate_potcar.py
+------------------
+Generate VASP POTCAR automatically based on a predefined recommended potential mapping.
+You can optionally override specific elements using the --override flag.
+
+Usage:
+  python generate_potcar.py /path/to/potpaw_PBE [--override Bi=Bi Pb=Pb_d_GW]
+"""
+
+import os
+import argparse
+from pathlib import Path
+from pymatgen.core import Structure
+
+# ===== 推奨ポテンシャル対応表 =====
+RECOMMENDED_POTCARS = {
+    "H":"H", "He":"He",
+    "Li":"Li_sv", "Be":"Be", "B":"B", "C":"C", "N":"N", "O":"O", "F":"F", "Ne":"Ne",
+    "Na":"Na_pv", "Mg":"Mg",
+    "Al":"Al", "Si":"Si", "P":"P", "S":"S", "Cl":"Cl", "Ar":"Ar",
+    "K":"K_sv", "Ca":"Ca_sv", "Sc":"Sc_sv", "Ti":"Ti_sv", "V":"V_sv", "Cr":"Cr_pv",
+    "Mn":"Mn_pv", "Fe":"Fe", "Co":"Co", "Ni":"Ni", "Cu":"Cu", "Zn":"Zn",
+    "Ga":"Ga_d", "Ge":"Ge_d", "As":"As", "Se":"Se", "Br":"Br", "Kr":"Kr",
+    "Rb":"Rb_sv", "Sr":"Sr_sv", "Y":"Y_sv", "Zr":"Zr_sv", "Nb":"Nb_sv",
+    "Mo":"Mo_sv", "Tc":"Tc_pv", "Ru":"Ru_pv", "Rh":"Rh_pv", "Pd":"Pd",
+    "Ag":"Ag", "Cd":"Cd", "In":"In_d", "Sn":"Sn_d", "Sb":"Sb", "Te":"Te", "I":"I", "Xe":"Xe",
+    "Cs":"Cs_sv", "Ba":"Ba_sv", "La":"La",
+    "Ce":"Ce", "Pr":"Pr_3", "Nd":"Nd_3", "Pm":"Pm_3", "Sm":"Sm_3",
+    "Eu":"Eu_2", "Gd":"Gd_3", "Tb":"Tb_3", "Dy":"Dy_3", "Ho":"Ho_3",
+    "Er":"Er_3", "Tm":"Tm_3", "Yb":"Yb_2", "Lu":"Lu_3",
+    "Hf":"Hf_pv", "Ta":"Ta_pv", "W":"W_sv", "Re":"Re", "Os":"Os",
+    "Ir":"Ir", "Pt":"Pt", "Au":"Au", "Hg":"Hg", "Tl":"Tl_d", "Pb":"Pb_d",
+    "Bi":"Bi_d", "Po":"Po_d", "At":"At", "Rn":"Rn",
+    "Fr":"Fr_sv", "Ra":"Ra_sv", "Ac":"Ac", "Th":"Th", "Pa":"Pa",
+    "U":"U", "Np":"Np", "Pu":"Pu", "Am":"Am", "Cm":"Cm",
+}
+
+def get_elements_from_poscar(poscar_path="POSCAR"):
+    """Extract element order from POSCAR using pymatgen."""
+    struct = Structure.from_file(poscar_path)
+    symbols = [el.symbol for el in struct.composition.elements]
+    print(f"[INFO] Elements in POSCAR: {' '.join(symbols)}")
+    return symbols
+
+def generate_potcar(symbols, potdir, overrides=None, outdir="input"):
+    """Concatenate POTCARs from the given pseudopotential directory."""
+    potdir = Path(potdir)
+    outdir = Path(outdir)
+    outdir.mkdir(exist_ok=True)
+    potcar_path = outdir / "POTCAR"
+
+    # Apply overrides
+    potmap = RECOMMENDED_POTCARS.copy()
+    if overrides:
+        potmap.update(overrides)
+        print(f"[INFO] Override applied: {overrides}")
+
+    # remove old POTCAR if exists
+    if potcar_path.exists():
+        potcar_path.unlink()
+
+    with open(potcar_path, "wb") as fout:
+        for el in symbols:
+            if el not in potmap:
+                raise ValueError(f"No mapping for element: {el}")
+            potname = potmap[el]
+            potpath = potdir / potname / "POTCAR"
+            if not potpath.exists():
+                raise FileNotFoundError(f"POTCAR not found: {potpath}")
+            with open(potpath, "rb") as fin:
+                fout.write(fin.read())
+            print(f"[INFO] Added {potname}/POTCAR")
+
+    # write POTCAR.symbols
+    with open(outdir / "POTCAR.symbols", "w") as f:
+        for el in symbols:
+            f.write(f"{potmap[el]}\n")
+    print(f"[INFO] Wrote POTCAR.symbols")
+
+    print(f"[INFO] POTCAR successfully generated → {potcar_path.resolve()}")
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate POTCAR using recommended potentials.")
+    parser.add_argument("potdir", help="Path to pseudopotential directory (e.g. /path/to/potpaw_PBE)")
+    parser.add_argument("--override", nargs="+", help="Override potentials, e.g. Bi=Bi Pb=Pb_d_GW")
+    args = parser.parse_args()
+
+    if not Path("POSCAR").exists():
+        print("[ERROR] POSCAR not found in current directory.")
+        return
+
+    overrides = {}
+    if args.override:
+        for pair in args.override:
+            if "=" not in pair:
+                print(f"[WARN] Skipping invalid override: {pair}")
+                continue
+            el, pot = pair.split("=", 1)
+            overrides[el] = pot
+
+    symbols = get_elements_from_poscar("POSCAR")
+    generate_potcar(symbols, args.potdir, overrides)
+
+if __name__ == "__main__":
+    main()

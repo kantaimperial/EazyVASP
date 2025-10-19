@@ -45,7 +45,7 @@ def get_elements_from_poscar(poscar_path="POSCAR"):
     print(f"[INFO] Elements in POSCAR: {' '.join(symbols)}")
     return symbols
 
-def generate_potcar(symbols, potdir, overrides=None, outdir="input"):
+def generate_potcar(symbols, potdir, overrides=None, outdir="."):
     """Concatenate POTCARs from the given pseudopotential directory."""
     potdir = Path(potdir)
     outdir = Path(outdir)

@@ -78,7 +78,9 @@ input/
 ```
 
 Optional override example (use a different PAW for a specific element):
+```
 generate_POTCAR $VASP_PSPDIR –override Bi=Bi
+```
 
 ### 4. Suggest suitable k-point meshes
 
